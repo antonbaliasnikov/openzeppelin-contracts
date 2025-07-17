@@ -1,5 +1,6 @@
 /// ENVVAR
 // - COMPILER:      compiler version (default: 0.8.27)
+// - SOLX:          use solx compiler (default: false)
 // - SRC:           contracts folder to compile (default: contracts)
 // - RUNS:          number of optimization runs (default: 200)
 // - IR:            enable IR compilation (default: false)
@@ -18,7 +19,7 @@ const { argv } = require('yargs/yargs')()
     compiler: {
       alias: 'compileVersion',
       type: 'string',
-      default: '0.8.27',
+      default: '0.8.30',
     },
     src: {
       alias: 'source',
@@ -38,7 +39,7 @@ const { argv } = require('yargs/yargs')()
     evm: {
       alias: 'evmVersion',
       type: 'string',
-      default: 'prague',
+      default: 'cancun',
     },
     // Extra modules
     coverage: {
@@ -68,6 +69,29 @@ for (const f of fs.readdirSync(path.join(__dirname, 'hardhat'))) {
   require(path.join(__dirname, 'hardhat', f));
 }
 
+const { subtask } = require('hardhat/config');
+const { TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD } = require('hardhat/builtin-tasks/task-names');
+
+subtask(TASK_COMPILE_SOLIDITY_GET_SOLC_BUILD, async (args, hre, runSuper) => {
+  if (process.env.USE_SOLX === 'true') {
+    console.log(`👾👾 Compiling with solx compiler 👾👾`);
+    const compilerPath = process.env.SOLX;
+
+    return {
+      compilerPath,
+      isSolcJs: false, // if you are using a native compiler, set this to false
+      version: args.solcVersion,
+      // This is used as extra information in the build-info files,
+      // but other than that is not important
+      longVersion: 'solx-0.1.0-0.8.30',
+    };
+  }
+
+  // since we only want to override the compiler for version 0.8.30,
+  // the runSuper function allows us to call the default subtask.
+  return runSuper();
+});
+
 /**
  * @type import('hardhat/config').HardhatUserConfig
  */
@@ -80,8 +104,14 @@ module.exports = {
         runs: argv.runs,
       },
       evmVersion: argv.evm,
-      viaIR: argv.ir,
+      viaIR: process.env.VIA_IR === 'true',
       outputSelection: { '*': { '*': ['storageLayout'] } },
+    },
+  },
+  mocha: {
+    reporter: 'json',
+    reporterOptions: {
+      output: process.env.JUNIT_REPORT, // Path to output json file
     },
   },
   warnings: {
